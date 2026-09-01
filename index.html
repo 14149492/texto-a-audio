@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VozAI – Texto a Voz Premium</title>
+  <meta name="description" content="Convierte cualquier texto a voz de forma gratuita. Escucha en tiempo real o descarga el audio MP3. Múltiples idiomas y voces disponibles." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Background effects -->
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+
+  <div class="container">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="20" cy="20" r="20" fill="url(#logoGrad)"/>
+            <path d="M12 20c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <path d="M8 20c0-6.6 5.4-12 12-12s12 5.4 12 12" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+            <circle cx="20" cy="20" r="3" fill="white"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="0" y1="0" x2="40" y2="40">
+                <stop offset="0%" stop-color="#6366f1"/>
+                <stop offset="100%" stop-color="#8b5cf6"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <span class="logo-text">Voz<span class="logo-accent">AI</span></span>
+      </div>
+      <div class="header-badge">
+        <span class="badge-dot"></span>
+        Texto a Voz Premium
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+      <h1 class="hero-title">Convierte tu <span class="gradient-text">texto en voz</span><br/>en segundos</h1>
+      <p class="hero-subtitle">Reproduce, personaliza y descarga audio de alta calidad con un solo clic</p>
+    </section>
+
+    <!-- Main Card -->
+    <main class="main-card">
+
+      <!-- Text Input -->
+      <div class="input-section">
+        <div class="input-header">
+          <label for="textInput" class="input-label">
+            <svg class="label-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+            Tu texto
+          </label>
+          <div class="char-counter">
+            <span id="charCount">0</span> caracteres
+          </div>
+        </div>
+        <textarea
+          id="textInput"
+          class="text-input"
+          placeholder="Escribe o pega aquí el texto que deseas convertir a voz…"
+          rows="7"
+          spellcheck="true"
+        ></textarea>
+        <div class="input-actions">
+          <button id="clearBtn" class="action-btn" title="Limpiar texto">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            Limpiar
+          </button>
+          <button id="pasteBtn" class="action-btn" title="Pegar texto">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+            Pegar
+          </button>
+          <button id="sampleBtn" class="action-btn" title="Texto de ejemplo">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.396 0 2.7.358 3.843 1 .54.318 1.157.318 1.697 0A8.173 8.173 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
+            Ejemplo
+          </button>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls-grid">
+        <!-- Voice selector -->
+        <div class="control-group">
+          <label class="control-label">
+            <svg class="control-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clip-rule="evenodd"/></svg>
+            Voz
+          </label>
+          <select id="voiceSelect" class="control-select">
+            <option value="">Cargando voces…</option>
+          </select>
+        </div>
+
+        <!-- Language selector -->
+        <div class="control-group">
+          <label class="control-label">
+            <svg class="control-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7 2a1 1 0 011 1v1h3a1 1 0 110 2H9.578a18.87 18.87 0 01-1.724 4.78c.29.354.596.696.914 1.026a1 1 0 11-1.44 1.389c-.188-.196-.373-.396-.554-.6a19.098 19.098 0 01-3.107 3.567 1 1 0 01-1.334-1.49 17.087 17.087 0 003.13-3.733 18.992 18.992 0 01-1.487-2.494 1 1 0 111.79-.89c.234.47.489.928.764 1.372.417-.934.752-1.913.997-2.927H3a1 1 0 110-2h3V3a1 1 0 011-1zm6 6a1 1 0 01.894.553l2.991 5.992a.869.869 0 01.02.037l.99 1.98a1 1 0 11-1.79.895L15.383 16h-4.764l-.724 1.447a1 1 0 11-1.788-.894l.99-1.98.019-.038 2.99-5.992A1 1 0 0113 8zm-1.382 6h2.764L13 11.236 11.618 14z" clip-rule="evenodd"/></svg>
+            Idioma
+          </label>
+          <select id="langSelect" class="control-select">
+            <option value="es-ES">🇪🇸 Español (España)</option>
+            <option value="es-MX">🇲🇽 Español (México)</option>
+            <option value="es-AR">🇦🇷 Español (Argentina)</option>
+            <option value="en-US">🇺🇸 English (US)</option>
+            <option value="en-GB">🇬🇧 English (UK)</option>
+            <option value="fr-FR">🇫🇷 Français</option>
+            <option value="de-DE">🇩🇪 Deutsch</option>
+            <option value="it-IT">🇮🇹 Italiano</option>
+            <option value="pt-BR">🇧🇷 Português (BR)</option>
+            <option value="pt-PT">🇵🇹 Português (PT)</option>
+            <option value="ja-JP">🇯🇵 日本語</option>
+            <option value="zh-CN">🇨🇳 中文 (简体)</option>
+          </select>
+        </div>
+
+        <!-- Speed -->
+        <div class="control-group slider-group">
+          <label class="control-label">
+            <svg class="control-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+            Velocidad
+          </label>
+          <div class="slider-wrapper">
+            <input type="range" id="speedRange" min="0.5" max="2" step="0.1" value="1" class="slider" />
+            <span id="speedVal" class="slider-val">1.0×</span>
+          </div>
+        </div>
+
+        <!-- Pitch -->
+        <div class="control-group slider-group">
+          <label class="control-label">
+            <svg class="control-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
+            Tono
+          </label>
+          <div class="slider-wrapper">
+            <input type="range" id="pitchRange" min="0.5" max="2" step="0.1" value="1" class="slider" />
+            <span id="pitchVal" class="slider-val">1.0</span>
+          </div>
+        </div>
+
+        <!-- Volume -->
+        <div class="control-group slider-group">
+          <label class="control-label">
+            <svg class="control-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            Volumen
+          </label>
+          <div class="slider-wrapper">
+            <input type="range" id="volumeRange" min="0" max="1" step="0.05" value="1" class="slider" />
+            <span id="volumeVal" class="slider-val">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Waveform visualizer -->
+      <div class="visualizer-section">
+        <canvas id="waveCanvas" class="wave-canvas"></canvas>
+        <div class="visualizer-label" id="vizLabel">Listo para reproducir</div>
+      </div>
+
+      <!-- Player Controls -->
+      <div class="player-section">
+        <div class="player-controls">
+          <button id="stopBtn" class="player-btn stop-btn" title="Detener" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+          </button>
+          <button id="playBtn" class="player-btn play-btn" title="Reproducir">
+            <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+          <button id="downloadBtn" class="player-btn download-btn" title="Descargar audio" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          </button>
+        </div>
+
+        <div class="progress-section">
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <div class="progress-labels">
+            <span id="currentTime">0:00</span>
+            <span id="totalTime">0:00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Download Section -->
+      <div class="download-section" id="downloadSection" style="display:none">
+        <div class="download-card">
+          <div class="download-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-2.18c.07-.44.18-.88.18-1.34C18 2.54 15.46 0 12.34 0A5.66 5.66 0 007 4.01 5.003 5.003 0 000 9c0 2.76 2.24 5 5 5h15c2.21 0 4-1.79 4-4 0-2.11-1.63-3.82-3.68-3.99l-.32-.01zm-5 3l-3 3-3-3h2V6h2v3h2z" opacity="0.5"/><path d="M19 9h-4V3H9v6H5l7 7 7-7z"/></svg>
+          </div>
+          <div class="download-info">
+            <p class="download-title">Audio listo para descargar</p>
+            <p class="download-subtitle" id="downloadSubtitle">Generando audio...</p>
+          </div>
+          <a id="downloadLink" class="download-btn-main" download="vozai-audio.wav">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            Descargar WAV
+          </a>
+        </div>
+      </div>
+
+      <!-- Status -->
+      <div class="status-bar" id="statusBar">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Ingresa un texto y presiona Reproducir</span>
+      </div>
+    </main>
+
+    <!-- Features -->
+    <section class="features">
+      <div class="feature-card">
+        <div class="feature-icon">🎙️</div>
+        <h3>Múltiples voces</h3>
+        <p>Accede a todas las voces del sistema en docenas de idiomas</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Reproducción instantánea</h3>
+        <p>Escucha tu texto convertido a voz en tiempo real</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📥</div>
+        <h3>Descarga gratuita</h3>
+        <p>Descarga el audio generado en formato WAV sin límites</p>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>VozAI &copy; 2025 · Tecnología Web Speech API · Procesado 100% en tu navegador</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
