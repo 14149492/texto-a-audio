@@ -387,20 +387,24 @@ function cleanPdfText(rawText) {
   }
 
   // 4. Re-join lines broken by the PDF layout (keeps sentence/paragraph breaks)
-  let result = '';
+  const chunks = [];
+  let prevLine = '';
   for (const line of outLines) {
     if (line.startsWith(CHAPTER_SENTINEL)) {
-      result += `\n${line}\n`;
+      chunks.push(`\n${line}\n`);
+      prevLine = '\n';
       continue;
     }
-    if (!result || result.endsWith('\n')) {
-      result += line;
-    } else if (/[.!?…:”"»)\]~♪]$/.test(result)) {
-      result += '\n' + line;
+    if (!prevLine || prevLine.endsWith('\n')) {
+      chunks.push(line);
+    } else if (/[.!?…:”"»)\]~♪]$/.test(prevLine)) {
+      chunks.push('\n' + line);
     } else {
-      result += ' ' + line;
+      chunks.push(' ' + line);
     }
+    prevLine = line;
   }
+  const result = chunks.join('');
 
   console.log(`[PDF] Limpieza: ${pages.length} páginas, ${repeated.size} encabezados repetidos eliminados, ${markersFound} marcas de capítulo detectadas`);
   return result;
@@ -712,6 +716,27 @@ const server = http.createServer(serverOptions, async (req, res) => {
       console.error('TTS Synthesis Error:', err.message);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message || 'Speech synthesis failed' }));
+    }
+    return;
+  }
+
+  // API Endpoint: Extract plain text from document (for free text mode)
+  if (req.url === '/api/extract-text' && req.method === 'POST') {
+    try {
+      const filename = decodeURIComponent(req.headers['x-filename'] || 'documento.pdf');
+      const buffer = await readRawBody(req);
+      console.log(`[ExtractText] Recibido archivo: ${filename} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
+      const fullText = await extractTextFromFile(buffer, filename);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        filename,
+        text: fullText
+      }));
+    } catch (err) {
+      console.error('[ExtractText Error]:', err.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message || 'Error al extraer texto del documento' }));
     }
     return;
   }

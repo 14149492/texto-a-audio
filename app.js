@@ -78,6 +78,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   pasteBtn.addEventListener('click', pasteText);
   sampleBtn.addEventListener('click', loadSample);
   downloadBtn.addEventListener('click', prepareDownload);
+  initFreeDocUpload();
   window.addEventListener('resize', resizeCanvas);
 });
 
@@ -194,6 +195,72 @@ function loadSample() {
   sampleIdx++;
   onTextChange();
   setStatus('idle', 'Texto de ejemplo cargado');
+}
+
+function initFreeDocUpload() {
+  const uploadDocBtn = document.getElementById('uploadDocBtn');
+  const freeDocInput = document.getElementById('freeDocInput');
+  if (!uploadDocBtn || !freeDocInput) return;
+
+  uploadDocBtn.addEventListener('click', () => freeDocInput.click());
+
+  freeDocInput.addEventListener('change', async (e) => {
+    if (e.target.files && e.target.files[0]) {
+      await loadDocIntoFreeText(e.target.files[0]);
+      freeDocInput.value = '';
+    }
+  });
+
+  // Drag & drop directly onto textInput
+  textInput.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    textInput.classList.add('dragover');
+  });
+  textInput.addEventListener('dragleave', () => {
+    textInput.classList.remove('dragover');
+  });
+  textInput.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    textInput.classList.remove('dragover');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      await loadDocIntoFreeText(e.dataTransfer.files[0]);
+    }
+  });
+}
+
+async function loadDocIntoFreeText(file) {
+  const allowed = ['.docx', '.pdf', '.txt'];
+  const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+  if (!allowed.includes(ext)) {
+    alert('Por favor selecciona un archivo Word (.docx), PDF (.pdf) o Texto (.txt)');
+    return;
+  }
+
+  setStatus('loading', `Extrayendo texto de "${file.name}"...`);
+  try {
+    const res = await fetch('/api/extract-text', {
+      method: 'POST',
+      headers: {
+        'X-Filename': encodeURIComponent(file.name)
+      },
+      body: file
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Error ${res.status}`);
+    }
+
+    const data = await res.json();
+    textInput.value = (data.text || '').slice(0, 500000);
+    onTextChange();
+    const words = textInput.value.trim() ? textInput.value.trim().split(/\s+/).length : 0;
+    setStatus('idle', `Texto cargado de "${file.name}": ${textInput.value.length.toLocaleString()} caracteres (${words.toLocaleString()} palabras). ¡Listo para escuchar!`);
+  } catch (err) {
+    console.error('Error extrayendo texto:', err);
+    alert('Error al extraer texto: ' + err.message);
+    setStatus('error', 'Error al procesar documento');
+  }
 }
 
 // ── Sliders ────────────────────────────────────────────────
@@ -579,7 +646,11 @@ function initNovelMode() {
     if (novelSection) novelSection.style.display = 'block';
   });
 
-  novelDropzone.addEventListener('click', () => novelFileInput.click());
+  novelDropzone.addEventListener('click', (e) => {
+    if (e.target.closest('button') || e.target.closest('a')) return;
+    novelFileInput.click();
+  });
+
   novelFileInput.addEventListener('change', (e) => {
     if (e.target.files && e.target.files[0]) {
       uploadNovelFile(e.target.files[0]);
@@ -615,16 +686,25 @@ async function uploadNovelFile(file) {
     return;
   }
 
-  const originalContent = novelDropzone.innerHTML;
-  novelDropzone.innerHTML = `
+  const dropContent = document.getElementById('novelDropzoneContent') || novelDropzone;
+  const originalContent = dropContent.innerHTML;
+
+  let seconds = 0;
+  dropContent.innerHTML = `
     <div class="dropzone-content">
       <div class="dropzone-icon" style="animation: spin 1.5s linear infinite;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       </div>
-      <h3>Analizando "${file.name}"...</h3>
-      <p>Extrayendo texto y detectando capítulos automáticamente. Esto tomará unos segundos.</p>
+      <h3>Analizando "${escapeHtml(file.name)}"... <span id="uploadTimer" style="color: var(--accent-1); font-size: 0.95rem;">(0s)</span></h3>
+      <p style="max-width: 500px; margin: 0 auto; color: var(--text-secondary);">Extrayendo texto y detectando capítulos automáticamente.<br/><strong style="color: var(--text-primary);">Nota:</strong> Para libros grandes (+1.000 páginas) este análisis puede tomar 1 o 2 minutos. Por favor no cierres la ventana.</p>
     </div>
   `;
+
+  const timerInterval = setInterval(() => {
+    seconds++;
+    const timerEl = document.getElementById('uploadTimer');
+    if (timerEl) timerEl.textContent = `(${seconds}s)`;
+  }, 1000);
 
   try {
     setStatus('loading', `Analizando documento "${file.name}"...`);
@@ -658,14 +738,47 @@ async function uploadNovelFile(file) {
 
     novelSummaryCard.style.display = 'block';
     setStatus('idle', `Novela cargada: ${novelChapters.length} capítulos listos para generar`);
+
+    dropContent.innerHTML = `
+      <div class="dropzone-content">
+        <div class="dropzone-icon" style="background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.4);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <h3 style="color: #10b981;">✅ Novela cargada: "${escapeHtml(file.name)}"</h3>
+        <p style="margin-bottom: 14px; color: var(--text-secondary);"><strong>${novelChapters.length} capítulos detectados</strong> · ${data.totalWords.toLocaleString()} palabras · ~${estHours} h de audio</p>
+        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+          <button type="button" class="primary-batch-btn" id="quickStartBtn" style="padding: 10px 20px; font-size: 0.95rem;">
+            ▶️ Generar Audio Ahora
+          </button>
+          <button type="button" class="action-btn" id="reUploadBtn" style="padding: 10px 16px;">
+            🔄 Subir otro archivo
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('quickStartBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startBatchProcessing();
+    });
+
+    document.getElementById('reUploadBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropContent.innerHTML = originalContent;
+      novelFileInput.value = '';
+      novelFileInput.click();
+    });
+
     novelSummaryCard.scrollIntoView({ behavior: 'smooth' });
 
   } catch (err) {
     console.error('Error al subir novela:', err);
     alert('Error al analizar la novela: ' + err.message);
     setStatus('error', 'Error al procesar el archivo');
+    dropContent.innerHTML = originalContent;
   } finally {
-    novelDropzone.innerHTML = originalContent;
+    clearInterval(timerInterval);
+    novelFileInput.value = '';
   }
 }
 

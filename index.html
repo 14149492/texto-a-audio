@@ -69,7 +69,7 @@
         <!-- Upload Box -->
         <div class="dropzone" id="novelDropzone">
           <input type="file" id="novelFileInput" accept=".docx,.pdf,.txt" style="display: none;" />
-          <div class="dropzone-content">
+          <div class="dropzone-content" id="novelDropzoneContent">
             <div class="dropzone-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
             </div>
@@ -164,6 +164,11 @@
           spellcheck="true"
         ></textarea>
         <div class="input-actions">
+          <input type="file" id="freeDocInput" accept=".docx,.pdf,.txt" style="display: none;" />
+          <button id="uploadDocBtn" class="action-btn" title="Cargar archivo PDF, Word o TXT" type="button">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            📁 Cargar PDF / Doc
+          </button>
           <button id="clearBtn" class="action-btn" title="Limpiar texto">
             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             Limpiar
