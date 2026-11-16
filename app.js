@@ -1,82 +1,83 @@
 /* ============================================================
-   VozAI — app.js  |  Text-to-Speech Engine + WAV Recorder
+   VozAI — app.js  |  Neural AI Human Voice Engine
    ============================================================ */
 
 'use strict';
 
-// ── DOM references ─────────────────────────────────────────
-const textInput       = document.getElementById('textInput');
-const charCount       = document.getElementById('charCount');
-const voiceSelect     = document.getElementById('voiceSelect');
-const langSelect      = document.getElementById('langSelect');
-const speedRange      = document.getElementById('speedRange');
-const pitchRange      = document.getElementById('pitchRange');
-const volumeRange     = document.getElementById('volumeRange');
-const speedVal        = document.getElementById('speedVal');
-const pitchVal        = document.getElementById('pitchVal');
-const volumeVal       = document.getElementById('volumeVal');
-const playBtn         = document.getElementById('playBtn');
-const stopBtn         = document.getElementById('stopBtn');
-const downloadBtn     = document.getElementById('downloadBtn');
-const playIcon        = document.getElementById('playIcon');
-const pauseIcon       = document.getElementById('pauseIcon');
-const progressBar     = document.getElementById('progressBar');
-const currentTimeEl   = document.getElementById('currentTime');
-const totalTimeEl     = document.getElementById('totalTime');
-const statusDot       = document.getElementById('statusDot');
-const statusText      = document.getElementById('statusText');
-const vizLabel        = document.getElementById('vizLabel');
-const waveCanvas      = document.getElementById('waveCanvas');
-const downloadSection = document.getElementById('downloadSection');
-const downloadLink    = document.getElementById('downloadLink');
-const downloadSubtitle = document.getElementById('downloadSubtitle');
-const clearBtn        = document.getElementById('clearBtn');
-const pasteBtn        = document.getElementById('pasteBtn');
-const sampleBtn       = document.getElementById('sampleBtn');
+// ── DOM References ─────────────────────────────────────────
+const textInput          = document.getElementById('textInput');
+const charCount          = document.getElementById('charCount');
+const wordCount          = document.getElementById('wordCount');
+const voiceSelect        = document.getElementById('voiceSelect');
+const engineSelect       = document.getElementById('engineSelect');
+const elevenLabsContainer= document.getElementById('elevenLabsContainer');
+const elevenKeyInput     = document.getElementById('elevenKeyInput');
+const speedRange         = document.getElementById('speedRange');
+const pitchRange         = document.getElementById('pitchRange');
+const speedVal           = document.getElementById('speedVal');
+const pitchVal           = document.getElementById('pitchVal');
+const playBtn            = document.getElementById('playBtn');
+const stopBtn            = document.getElementById('stopBtn');
+const downloadBtn        = document.getElementById('downloadBtn');
+const playIcon           = document.getElementById('playIcon');
+const pauseIcon          = document.getElementById('pauseIcon');
+const progressBar        = document.getElementById('progressBar');
+const currentTimeEl      = document.getElementById('currentTime');
+const totalTimeEl        = document.getElementById('totalTime');
+const statusDot          = document.getElementById('statusDot');
+const statusText         = document.getElementById('statusText');
+const vizLabel           = document.getElementById('vizLabel');
+const waveCanvas         = document.getElementById('waveCanvas');
+const downloadSection    = document.getElementById('downloadSection');
+const downloadLink       = document.getElementById('downloadLink');
+const downloadSubtitle   = document.getElementById('downloadSubtitle');
+const clearBtn           = document.getElementById('clearBtn');
+const pasteBtn           = document.getElementById('pasteBtn');
+const sampleBtn          = document.getElementById('sampleBtn');
+const metricsPanel       = document.getElementById('metricsPanel');
+const metricsLiveBadge   = document.getElementById('metricsLiveBadge');
+const metricTime         = document.getElementById('metricTime');
+const metricSpeed        = document.getElementById('metricSpeed');
+const metricSize         = document.getElementById('metricSize');
+const metricBreakdown    = document.getElementById('metricBreakdown');
 
 // ── State ──────────────────────────────────────────────────
-let voices        = [];
-let isSpeaking    = false;
-let isPaused      = false;
-let utterance     = null;
-let startTime     = null;
-let estimatedDuration = 0;
-let progressTimer = null;
-let animFrame     = null;
-let audioCtx      = null;
-let analyser      = null;
-let recorder      = null;
-let recordedChunks = [];
-let audioBlob      = null;
-let waveData       = new Float32Array(128).fill(0);
+let voices           = [];
+let currentAudio     = null;
+let currentAudioUrl  = null;
+let isPlaying        = false;
+let isPaused         = false;
+let audioCtx         = null;
+let analyser         = null;
+let animFrame        = null;
+let lastTextPlayed   = '';
+let synthIntervalTimer = null;
 
-// Canvas context
 const ctx = waveCanvas.getContext('2d');
 
-// ── Sample texts ───────────────────────────────────────────
+// Sample texts
 const samples = [
-  'Bienvenido a VozAI, tu asistente de texto a voz más avanzado. Convierte cualquier texto en audio de alta calidad en segundos.',
-  'La inteligencia artificial está transformando la forma en que interactuamos con la tecnología. Hoy, podemos convertir texto en voz de manera natural.',
-  'El conocimiento es poder. La educación es la llave que abre la puerta a un mundo de oportunidades infinitas para quienes la buscan.',
+  'Hola, bienvenido a VozAI. Esta es una muestra de voz neuronal inteligente con entonación humana de alta fidelidad.',
+  'La inteligencia artificial moderna permite generar lecturas con expresión, pausas naturales y máxima claridad.',
+  'El conocimiento abre puertas infinitas. Transforma tus textos en contenido de audio listo para escuchar o descargar.',
 ];
 let sampleIdx = 0;
 
 // ── Init ───────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   resizeCanvas();
-  loadVoices();
   drawIdleWave();
   initSliders();
+  await loadVoices();
 
-  window.speechSynthesis.onvoiceschanged = loadVoices;
   textInput.addEventListener('input', onTextChange);
-  langSelect.addEventListener('change', loadVoices);
+  engineSelect.addEventListener('change', onEngineChange);
   playBtn.addEventListener('click', togglePlay);
-  stopBtn.addEventListener('click', stopSpeech);
+  stopBtn.addEventListener('click', stopAudio);
   clearBtn.addEventListener('click', clearText);
   pasteBtn.addEventListener('click', pasteText);
   sampleBtn.addEventListener('click', loadSample);
-  downloadBtn.addEventListener('click', generateDownload);
+  downloadBtn.addEventListener('click', prepareDownload);
   window.addEventListener('resize', resizeCanvas);
 });
 
@@ -86,97 +87,127 @@ function resizeCanvas() {
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 }
 
-// ── Voice Loader ───────────────────────────────────────────
-function loadVoices() {
-  voices = window.speechSynthesis.getVoices();
-  const lang = langSelect.value;
+// ── Load Neural Voices ─────────────────────────────────────
+async function loadVoices() {
+  try {
+    setStatus('loading', 'Cargando voces neuronales humanas…');
+    const res = await fetch('/api/voices');
+    const data = await res.json();
+    voices = data.voices || [];
 
-  // Filter voices matching the selected language prefix
-  const langCode = lang.split('-')[0];
-  let filtered = voices.filter(v =>
-    v.lang.startsWith(langCode) || v.lang === lang
-  );
-  if (filtered.length === 0) filtered = voices; // fallback
+    voiceSelect.innerHTML = '';
+    if (voices.length === 0) {
+      voiceSelect.innerHTML = '<option value="">No se encontraron voces</option>';
+      return;
+    }
 
-  voiceSelect.innerHTML = '';
-  if (filtered.length === 0) {
-    voiceSelect.innerHTML = '<option value="">No hay voces disponibles</option>';
-    return;
+    // Group by language
+    const groups = {};
+    voices.forEach(v => {
+      const groupName = getLangName(v.lang);
+      if (!groups[groupName]) groups[groupName] = [];
+      groups[groupName].push(v);
+    });
+
+    for (const [groupName, vList] of Object.entries(groups)) {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = groupName;
+      vList.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.id;
+        opt.textContent = `${v.flag} ${v.name} – ${v.desc}`;
+        opt.selected = true;
+        optgroup.appendChild(opt);
+      });
+      voiceSelect.appendChild(optgroup);
+    }
+
+    setStatus('idle', 'Voces neuronales cargadas correctamente');
+  } catch (err) {
+    console.error('Error cargando voces:', err);
+    setStatus('error', 'Error conectando con el servidor de voces');
   }
-
-  filtered.forEach((v, i) => {
-    const opt = document.createElement('option');
-    opt.value = voices.indexOf(v);
-    const flag = getLangFlag(v.lang);
-    opt.textContent = `${flag} ${v.name} (${v.lang})`;
-    if (v.default) opt.selected = true;
-    voiceSelect.appendChild(opt);
-  });
 }
 
-function getLangFlag(lang) {
+function getLangName(langCode) {
   const map = {
-    'es':'🇪🇸','en':'🇺🇸','fr':'🇫🇷','de':'🇩🇪',
-    'it':'🇮🇹','pt':'🇧🇷','ja':'🇯🇵','zh':'🇨🇳',
-    'ko':'🇰🇷','ar':'🇸🇦','ru':'🇷🇺','nl':'🇳🇱',
+    'es-ES': '🇪🇸 Español (España)',
+    'es-MX': '🇲🇽 Español (México)',
+    'es-US': '🇺🇸 Español (EE.UU. / Latino)',
+    'es-AR': '🇦🇷 Español (Argentina)',
+    'es-CO': '🇨🇴 Español (Colombia)',
+    'es-CL': '🇨🇱 Español (Chile)',
+    'en-US': '🇺🇸 English (US)',
+    'en-GB': '🇬🇧 English (UK)',
+    'fr-FR': '🇫🇷 Français',
+    'de-DE': '🇩🇪 Deutsch',
+    'it-IT': '🇮🇹 Italiano',
+    'pt-BR': '🇧🇷 Português',
   };
-  const code = lang.split('-')[0].toLowerCase();
-  return map[code] || '🌐';
+  return map[langCode] || langCode;
+}
+
+function onEngineChange() {
+  if (engineSelect.value === 'elevenlabs') {
+    elevenLabsContainer.style.display = 'block';
+  } else {
+    elevenLabsContainer.style.display = 'none';
+  }
 }
 
 // ── Text Events ────────────────────────────────────────────
 function onTextChange() {
-  const len = textInput.value.length;
-  charCount.textContent = len;
-  audioBlob = null;
+  const text = textInput.value;
+  const len = text.length;
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  charCount.textContent = len.toLocaleString();
+  if (wordCount) wordCount.textContent = words.toLocaleString();
   downloadSection.style.display = 'none';
   downloadBtn.disabled = len === 0;
 }
 
 function clearText() {
+  stopAudio();
   textInput.value = '';
   charCount.textContent = '0';
-  audioBlob = null;
+  if (wordCount) wordCount.textContent = '0';
   downloadSection.style.display = 'none';
   downloadBtn.disabled = true;
-  setStatus('idle', 'Texto borrado');
+  setStatus('idle', 'Texto limpiado');
 }
 
 async function pasteText() {
   try {
     const text = await navigator.clipboard.readText();
-    textInput.value = text.slice(0, 5000);
+    textInput.value = text.slice(0, 500000); // Soporta hasta 500,000 caracteres (~80,000 palabras)
     onTextChange();
-    setStatus('idle', `Texto pegado · ${textInput.value.length} caracteres`);
+    const words = textInput.value.trim() ? textInput.value.trim().split(/\s+/).length : 0;
+    setStatus('idle', `Texto pegado · ${textInput.value.length.toLocaleString()} caracteres (${words.toLocaleString()} palabras)`);
   } catch {
     setStatus('error', 'No se pudo acceder al portapapeles');
   }
 }
 
 function loadSample() {
+  stopAudio();
   textInput.value = samples[sampleIdx % samples.length];
   sampleIdx++;
   onTextChange();
   setStatus('idle', 'Texto de ejemplo cargado');
 }
 
-// ── Slider Updates ─────────────────────────────────────────
+// ── Sliders ────────────────────────────────────────────────
 function initSliders() {
   speedRange.addEventListener('input', () => {
-    speedVal.textContent = parseFloat(speedRange.value).toFixed(1) + '×';
+    speedVal.textContent = parseFloat(speedRange.value).toFixed(2) + '×';
     updateSliderFill(speedRange);
   });
   pitchRange.addEventListener('input', () => {
-    pitchVal.textContent = parseFloat(pitchRange.value).toFixed(1);
+    pitchVal.textContent = parseFloat(pitchRange.value).toFixed(2);
     updateSliderFill(pitchRange);
-  });
-  volumeRange.addEventListener('input', () => {
-    volumeVal.textContent = Math.round(volumeRange.value * 100) + '%';
-    updateSliderFill(volumeRange);
   });
   updateSliderFill(speedRange);
   updateSliderFill(pitchRange);
-  updateSliderFill(volumeRange);
 }
 
 function updateSliderFill(slider) {
@@ -187,553 +218,666 @@ function updateSliderFill(slider) {
   slider.style.background = `linear-gradient(to right, #6366f1 ${pct}%, rgba(255,255,255,0.1) ${pct}%)`;
 }
 
-// ── Speech Synthesis ───────────────────────────────────────
-function togglePlay() {
-  if (isSpeaking && !isPaused) {
-    pauseSpeech();
+// ── Audio Playback ─────────────────────────────────────────
+async function togglePlay() {
+  if (isPlaying && !isPaused) {
+    pauseAudio();
   } else if (isPaused) {
-    resumeSpeech();
+    resumeAudio();
   } else {
-    startSpeech();
+    await startAudio();
   }
 }
 
-function startSpeech() {
+async function startAudio() {
   const text = textInput.value.trim();
   if (!text) {
-    setStatus('error', 'Ingresa un texto primero');
-    textInput.focus();
+    setStatus('error', 'Por favor ingresa un texto para reproducir');
     return;
   }
 
-  window.speechSynthesis.cancel();
-  utterance = new SpeechSynthesisUtterance(text);
+  // Clear previous timer if any
+  if (synthIntervalTimer) clearInterval(synthIntervalTimer);
 
-  // Voice
-  const voiceIdx = parseInt(voiceSelect.value);
-  if (!isNaN(voiceIdx) && voices[voiceIdx]) {
-    utterance.voice = voices[voiceIdx];
-  }
-  utterance.lang   = langSelect.value;
-  utterance.rate   = parseFloat(speedRange.value);
-  utterance.pitch  = parseFloat(pitchRange.value);
-  utterance.volume = parseFloat(volumeRange.value);
+  const startTime = performance.now();
 
-  // Estimate duration: ~130 words/min * rate, ~5 chars/word
-  const wordCount = text.split(/\s+/).length;
-  estimatedDuration = (wordCount / (130 * utterance.rate)) * 60;
+  // Show and reset Metrics Panel for real-time monitoring
+  metricsPanel.style.display = 'block';
+  metricsLiveBadge.className = 'metrics-live-badge';
+  metricsLiveBadge.textContent = '⏱️ SINTETIZANDO EN VIVO';
+  metricTime.textContent = '0.00 s';
+  metricSpeed.textContent = '0 caract/s';
+  metricSize.textContent = 'Calculando...';
+  metricBreakdown.textContent = 'Procesando...';
 
-  utterance.onstart = () => {
-    isSpeaking = true; isPaused = false;
-    startTime = Date.now();
-    playIcon.style.display  = 'none';
-    pauseIcon.style.display = 'block';
-    stopBtn.disabled   = false;
-    progressBar.style.width = '0%';
-    vizLabel.classList.add('hidden');
-    setStatus('active', 'Reproduciendo audio…');
-    startProgressTimer();
-    startWaveAnimation();
-    totalTimeEl.textContent = formatTime(estimatedDuration);
-  };
+  // Start real-time live timer UI updates
+  synthIntervalTimer = setInterval(() => {
+    const elapsedSec = ((performance.now() - startTime) / 1000).toFixed(2);
+    metricTime.textContent = `${elapsedSec} s`;
+    const estSpeed = Math.round(text.length / Math.max(0.1, (performance.now() - startTime) / 1000));
+    metricSpeed.textContent = `${estSpeed.toLocaleString()} caract/s`;
+    
+    setStatus('loading', `⏱️ Sintetizando voz neuronal en tiempo real (${elapsedSec}s)...`);
+    vizLabel.textContent = `⏱️ Tiempo de síntesis en vivo: ${elapsedSec}s (${text.length.toLocaleString()} caracteres)`;
+  }, 50);
 
-  utterance.onend = () => {
-    isSpeaking = false; isPaused = false;
-    playIcon.style.display  = 'block';
-    pauseIcon.style.display = 'none';
-    stopBtn.disabled = true;
-    progressBar.style.width = '100%';
-    clearInterval(progressTimer);
-    cancelAnimationFrame(animFrame);
-    vizLabel.classList.remove('hidden');
-    vizLabel.textContent = 'Reproducción finalizada';
-    setStatus('success', 'Texto reproducido completamente');
-    setTimeout(() => { progressBar.style.width = '0%'; currentTimeEl.textContent = '0:00'; }, 1500);
-    drawIdleWave();
-    // Enable download after playback
-    downloadBtn.disabled = false;
-  };
+  try {
+    playBtn.disabled = true;
+    stopBtn.disabled = false;
 
-  utterance.onerror = (e) => {
-    if (e.error === 'interrupted' || e.error === 'canceled') return;
-    setStatus('error', `Error al reproducir: ${e.error}`);
-    resetPlayer();
-  };
+    const voice = voiceSelect.value;
+    const engine = engineSelect.value;
+    const rate = speedRange.value;
+    const pitch = pitchRange.value;
+    const elevenKey = elevenKeyInput.value.trim();
 
-  utterance.onpause = () => {
-    isPaused = true;
-    clearInterval(progressTimer);
-    stopWaveAnimation();
-    vizLabel.classList.remove('hidden');
-    vizLabel.textContent = 'En pausa';
-    setStatus('idle', 'Reproducción pausada');
-  };
-
-  utterance.onresume = () => {
-    isPaused = false;
-    vizLabel.classList.add('hidden');
-    setStatus('active', 'Reproduciendo audio…');
-    startProgressTimer();
-    startWaveAnimation();
-  };
-
-  window.speechSynthesis.speak(utterance);
-}
-
-function pauseSpeech() {
-  if (isSpeaking) {
-    window.speechSynthesis.pause();
-    isPaused = true;
-    playIcon.style.display  = 'block';
-    pauseIcon.style.display = 'none';
-  }
-}
-
-function resumeSpeech() {
-  if (isPaused) {
-    window.speechSynthesis.resume();
-    isPaused = false;
-    playIcon.style.display  = 'none';
-    pauseIcon.style.display = 'block';
-  }
-}
-
-function stopSpeech() {
-  window.speechSynthesis.cancel();
-  resetPlayer();
-  setStatus('idle', 'Reproducción detenida');
-  vizLabel.textContent = 'Listo para reproducir';
-  downloadBtn.disabled = false;
-}
-
-function resetPlayer() {
-  isSpeaking = false; isPaused = false;
-  playIcon.style.display  = 'block';
-  pauseIcon.style.display = 'none';
-  stopBtn.disabled = true;
-  clearInterval(progressTimer);
-  cancelAnimationFrame(animFrame);
-  progressBar.style.width = '0%';
-  currentTimeEl.textContent = '0:00';
-  vizLabel.classList.remove('hidden');
-  drawIdleWave();
-}
-
-// ── Progress Timer ─────────────────────────────────────────
-function startProgressTimer() {
-  clearInterval(progressTimer);
-  const base = startTime || Date.now();
-  const pausedAt = isPaused ? Date.now() : null;
-
-  progressTimer = setInterval(() => {
-    const elapsed = (Date.now() - base) / 1000;
-    const pct = Math.min((elapsed / estimatedDuration) * 100, 99);
-    progressBar.style.width = pct + '%';
-    currentTimeEl.textContent = formatTime(elapsed);
-  }, 250);
-}
-
-function formatTime(secs) {
-  const m = Math.floor(secs / 60);
-  const s = Math.floor(secs % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-// ── Waveform Animation ─────────────────────────────────────
-let wavePhase = 0;
-let isAnimating = false;
-
-function startWaveAnimation() {
-  isAnimating = true;
-  animateWave();
-}
-
-function stopWaveAnimation() {
-  isAnimating = false;
-  cancelAnimationFrame(animFrame);
-}
-
-function animateWave() {
-  if (!isAnimating) return;
-  drawActiveWave();
-  animFrame = requestAnimationFrame(animateWave);
-}
-
-function drawIdleWave() {
-  const W = waveCanvas.offsetWidth;
-  const H = waveCanvas.offsetHeight;
-  ctx.clearRect(0, 0, W, H);
-
-  // Draw a flat subtle line
-  const grad = ctx.createLinearGradient(0, 0, W, 0);
-  grad.addColorStop(0, 'rgba(99,102,241,0)');
-  grad.addColorStop(0.5, 'rgba(99,102,241,0.3)');
-  grad.addColorStop(1, 'rgba(99,102,241,0)');
-
-  ctx.beginPath();
-  ctx.moveTo(0, H / 2);
-  for (let x = 0; x <= W; x += 2) {
-    const y = H / 2 + Math.sin(x * 0.04) * 2;
-    ctx.lineTo(x, y);
-  }
-  ctx.strokeStyle = grad;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-}
-
-function drawActiveWave() {
-  const W = waveCanvas.offsetWidth;
-  const H = waveCanvas.offsetHeight;
-  ctx.clearRect(0, 0, W, H);
-
-  wavePhase += 0.06;
-
-  const bars = 60;
-  const barW = (W / bars) * 0.6;
-  const gap  = W / bars;
-
-  for (let i = 0; i < bars; i++) {
-    const noise = Math.sin(i * 0.4 + wavePhase) * 0.5 +
-                  Math.sin(i * 0.9 - wavePhase * 1.3) * 0.3 +
-                  Math.sin(i * 0.2 + wavePhase * 0.7) * 0.2;
-    const amplitude = (Math.abs(noise) * 0.5 + 0.1) * (H * 0.75);
-    const x = i * gap + gap / 2;
-    const y = (H - amplitude) / 2;
-
-    const grad = ctx.createLinearGradient(x, y, x, y + amplitude);
-    grad.addColorStop(0, 'rgba(139,92,246,0.9)');
-    grad.addColorStop(0.5, 'rgba(99,102,241,1)');
-    grad.addColorStop(1, 'rgba(139,92,246,0.9)');
-
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.roundRect
-      ? ctx.roundRect(x - barW / 2, y, barW, amplitude, barW / 2)
-      : ctx.rect(x - barW / 2, y, barW, amplitude);
-    ctx.fill();
-  }
-
-  // Glow overlay
-  const glowGrad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W/2);
-  glowGrad.addColorStop(0, 'rgba(99,102,241,0.05)');
-  glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = glowGrad;
-  ctx.fillRect(0, 0, W, H);
-}
-
-// ── Download ───────────────────────────────────────────────
-// Instant download using free TTS APIs (no recording needed).
-// Strategy cascade:
-//   1. StreamElements TTS API (Amazon Polly, CORS-enabled, best quality)
-//   2. Google Translate TTS fetch (may fail CORS)
-//   3. Google TTS direct link (opens in new tab, always works)
-
-let isDownloading = false;
-
-// ── Voice map for StreamElements (Amazon Polly voices) ─────
-const POLLY_VOICES = {
-  'es': { female: ['Lucia', 'Conchita', 'Lupe', 'Mia'], male: ['Enrique', 'Miguel'] },
-  'en': { female: ['Joanna', 'Salli', 'Kendra'], male: ['Matthew', 'Joey'] },
-  'fr': { female: ['Celine', 'Lea'], male: ['Mathieu'] },
-  'de': { female: ['Marlene', 'Vicki'], male: ['Hans'] },
-  'it': { female: ['Carla', 'Bianca'], male: ['Giorgio'] },
-  'pt': { female: ['Vitoria', 'Camila'], male: ['Ricardo'] },
-  'ja': { female: ['Mizuki'], male: ['Takumi'] },
-  'zh': { female: ['Zhiyu'], male: [] },
-  'ko': { female: ['Seoyeon'], male: [] },
-  'ar': { female: ['Zeina'], male: [] },
-  'ru': { female: ['Tatyana'], male: ['Maxim'] },
-  'nl': { female: ['Lotte'], male: ['Ruben'] },
-};
-
-function getPollyVoice(lang) {
-  const code = lang.split('-')[0].toLowerCase();
-  const entry = POLLY_VOICES[code] || POLLY_VOICES['es'];
-  // Return first available voice (prefer female)
-  return entry.female[0] || entry.male[0] || 'Lucia';
-}
-
-// ── Split text into chunks ─────────────────────────────────
-function splitText(text, maxLen) {
-  const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
-  const chunks = [];
-  let current = '';
-
-  for (const sent of sentences) {
-    const words = sent.trim().split(/\s+/);
-    for (const word of words) {
-      if ((current + ' ' + word).trim().length > maxLen) {
-        if (current.trim()) chunks.push(current.trim());
-        current = word;
-      } else {
-        current = (current + ' ' + word).trim();
-      }
+    const headers = { 'Content-Type': 'application/json' };
+    if (engine === 'elevenlabs' && elevenKey) {
+      headers['X-ElevenLabs-ApiKey'] = elevenKey;
     }
-  }
-  if (current.trim()) chunks.push(current.trim());
-  return chunks;
-}
 
-// ── Main download handler ──────────────────────────────────
-async function generateDownload() {
-  const text = textInput.value.trim();
-  if (!text) {
-    setStatus('error', 'Ingresa un texto para descargar');
-    return;
-  }
-
-  if (isDownloading) return;
-  isDownloading = true;
-
-  downloadSection.style.display = 'block';
-  downloadSubtitle.textContent  = 'Generando audio…';
-  downloadBtn.disabled = true;
-  setStatus('active', 'Descargando audio…');
-
-  // Clean up previous extra links
-  const oldExtra = downloadSection.querySelector('.extra-links');
-  if (oldExtra) oldExtra.remove();
-
-  // ── Strategy 0: Local Server Proxy (/api/tts) ──
-  try {
-    await fetchLocalServerTTS(text);
-    isDownloading = false;
-    return;
-  } catch (err) {
-    console.warn('Strategy 0 (Local Server) failed:', err);
-  }
-
-  // ── Strategy 1: SoundofText API (Google Engine, 100% CORS-friendly) ──
-  try {
-    await fetchSoundOfTextTTS(text);
-    isDownloading = false;
-    return;
-  } catch (err) {
-    console.warn('Strategy 1 (SoundofText) failed:', err);
-  }
-
-  // ── Strategy 2: StreamElements TTS (Amazon Polly) ──
-  try {
-    await fetchStreamElementsTTS(text);
-    isDownloading = false;
-    return;
-  } catch (err) {
-    console.warn('Strategy 2 (StreamElements) failed:', err);
-  }
-
-  // ── Strategy 3: Google Translate TTS fetch (with CORS Proxy) ──
-  try {
-    await fetchGoogleTTS(text);
-    isDownloading = false;
-    return;
-  } catch (err) {
-    console.warn('Strategy 3 (Google TTS fetch) failed:', err);
-  }
-
-  // ── Fallback Error Display ──
-  setStatus('error', 'No se pudo conectar con el servidor de audio. Revisa tu conexión.');
-  downloadSubtitle.textContent = 'Error de conexión. Intenta de nuevo más tarde.';
-  downloadBtn.disabled = false;
-  isDownloading = false;
-}
-
-// ────────────────────────────────────────────────────────────
-// Strategy 0: Local Server API (/api/tts)
-// Instant, reliable MP3 server proxy
-// ────────────────────────────────────────────────────────────
-async function fetchLocalServerTTS(text) {
-  const lang = langSelect.value;
-  const url = `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text)}`;
-  
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Local server returned status: ${response.status}`);
-  
-  const blob = await response.blob();
-  if (blob.size < 200) throw new Error('Blob too small');
-  
-  audioBlob = blob;
-  presentDownloadFile(blob, 'mp3');
-}
-
-// ────────────────────────────────────────────────────────────
-// Strategy 1: SoundofText API (Google Engine)
-// Free, robust API specifically designed for TTS MP3 downloads
-// ────────────────────────────────────────────────────────────
-async function fetchSoundOfTextTTS(text) {
-  const lang = langSelect.value; // e.g. "es-ES"
-  const chunks = splitText(text, 100);
-  const blobs = [];
-
-  for (let i = 0; i < chunks.length; i++) {
-    downloadSubtitle.textContent = chunks.length > 1
-      ? `Generando parte ${i + 1} de ${chunks.length}…`
-      : 'Generando audio MP3…';
-
-    const req = await fetch('https://api.soundoftext.com/sounds', {
+    // Fetch audio blob via POST to prevent HTTP 431 header length errors
+    const res = await fetch('/api/tts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify({
-        engine: 'Google',
-        data: {
-          text: chunks[i],
-          voice: lang
-        }
+        text: text,
+        voice: voice,
+        engine: engine,
+        rate: rate,
+        pitch: pitch,
+        elevenlabs_key: elevenKey
       })
     });
 
-    if (!req.ok) throw new Error(`SoundofText API error: ${req.status}`);
-    const res = await req.json();
-
-    if (!res.success || !res.id) throw new Error('SoundofText generation failed');
-
-    const fileUrl = `https://files.soundoftext.com/${res.id}.mp3`;
-    const audioReq = await fetch(fileUrl);
-    if (!audioReq.ok) throw new Error(`Failed to fetch MP3 file: ${audioReq.status}`);
-
-    const blob = await audioReq.blob();
-    if (blob.size < 100) throw new Error('Audio blob too small');
-
-    blobs.push(blob);
-  }
-
-  const mergedBlob = new Blob(blobs, { type: 'audio/mpeg' });
-  if (mergedBlob.size < 200) throw new Error('Audio too small');
-
-  audioBlob = mergedBlob;
-  presentDownloadFile(mergedBlob, 'mp3');
-}
-
-// ────────────────────────────────────────────────────────────
-// Strategy 2: StreamElements TTS (Amazon Polly)
-// ────────────────────────────────────────────────────────────
-async function fetchStreamElementsTTS(text) {
-  const lang = langSelect.value;
-  const voice = getPollyVoice(lang);
-  const chunks = splitText(text, 150);
-  const blobs = [];
-
-  for (let i = 0; i < chunks.length; i++) {
-    downloadSubtitle.textContent = chunks.length > 1
-      ? `Generando parte ${i + 1} de ${chunks.length}…`
-      : 'Generando audio…';
-
-    const url = `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(chunks[i])}`;
-
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`StreamElements API error: ${response.status}`);
-
-    const blob = await response.blob();
-    if (blob.size < 100) throw new Error('Response too small');
-
-    blobs.push(blob);
-  }
-
-  const mergedBlob = new Blob(blobs, { type: 'audio/mpeg' });
-  if (mergedBlob.size < 200) throw new Error('Audio too small');
-
-  audioBlob = mergedBlob;
-  presentDownloadFile(mergedBlob, 'mp3');
-}
-
-// ────────────────────────────────────────────────────────────
-// Strategy 3: Google Translate TTS fetch (with CORS Proxy)
-// ────────────────────────────────────────────────────────────
-function buildGoogleTTSUrl(text, lang, client = 'gtx') {
-  return `https://translate.googleapis.com/translate_tts?client=${client}&ie=UTF-8&tl=${lang}&q=${encodeURIComponent(text)}`;
-}
-
-async function fetchGoogleTTS(text) {
-  const lang = langSelect.value.split('-')[0];
-  const chunks = splitText(text, 150);
-  const blobs = [];
-
-  for (let i = 0; i < chunks.length; i++) {
-    let fetched = false;
-
-    downloadSubtitle.textContent = chunks.length > 1
-      ? `Descargando parte ${i + 1} de ${chunks.length}…`
-      : 'Descargando audio…';
-
-    const rawUrl = buildGoogleTTSUrl(chunks[i], lang, 'gtx');
-    const urlsToTry = [
-      rawUrl,
-      `https://corsproxy.io/?${encodeURIComponent(rawUrl)}`,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(rawUrl)}`
-    ];
-
-    for (const targetUrl of urlsToTry) {
-      try {
-        const response = await fetch(targetUrl);
-        if (!response.ok) continue;
-
-        const blob = await response.blob();
-        if (blob.size < 100) continue;
-
-        blobs.push(blob);
-        fetched = true;
-        break;
-      } catch {
-        continue;
-      }
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Error de servidor HTTP ${res.status}`);
     }
-    if (!fetched) throw new Error(`Failed to fetch chunk ${i + 1}`);
+
+    // Extract performance headers sent by server
+    const serverTimeMs = parseFloat(res.headers.get('X-Response-Time-Ms') || '0');
+    const serverCharsPerSec = parseInt(res.headers.get('X-Chars-Per-Sec') || '0');
+
+    const blob = await res.blob();
+
+    // Stop real-time timer
+    if (synthIntervalTimer) {
+      clearInterval(synthIntervalTimer);
+      synthIntervalTimer = null;
+    }
+
+    const totalClientMs = performance.now() - startTime;
+    const totalClientSec = (totalClientMs / 1000).toFixed(2);
+    const netMs = Math.max(0, totalClientMs - serverTimeMs);
+    const sizeKb = (blob.size / 1024).toFixed(1);
+    const finalSpeed = serverCharsPerSec || Math.round(text.length / (totalClientMs / 1000 || 1));
+
+    // Update Metrics Panel with final metrics
+    metricsLiveBadge.className = 'metrics-live-badge complete';
+    metricsLiveBadge.textContent = '✅ COMPLETADO';
+    metricTime.textContent = `${totalClientSec} s`;
+    metricSpeed.textContent = `${finalSpeed.toLocaleString()} caract/s`;
+    metricSize.textContent = `${sizeKb} KB`;
+    metricBreakdown.textContent = `${(serverTimeMs / 1000).toFixed(2)}s Servidor / ${(netMs / 1000).toFixed(2)}s Red`;
+
+    if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
+    currentAudioUrl = URL.createObjectURL(blob);
+
+    // Setup audio element
+    if (currentAudio) {
+      currentAudio.pause();
+    }
+    currentAudio = new Audio(currentAudioUrl);
+    currentAudio.playbackRate = parseFloat(speedRange.value);
+
+    setupWebAudio(currentAudio);
+
+    currentAudio.onplay = () => {
+      isPlaying = true;
+      isPaused = false;
+      playBtn.disabled = false;
+      playIcon.style.display = 'none';
+      pauseIcon.style.display = 'block';
+      setStatus('speaking', `Reproduciendo voz humana neuronal HD (Sintetizado en ${totalClientSec}s)`);
+      vizLabel.textContent = '🔊 Reproduciendo Voz Humana HD';
+      drawActiveWave();
+    };
+
+    currentAudio.ontimeupdate = () => {
+      if (!currentAudio) return;
+      const cur = currentAudio.currentTime || 0;
+      const dur = currentAudio.duration || 1;
+      const pct = (cur / dur) * 100;
+      progressBar.style.width = `${pct}%`;
+      currentTimeEl.textContent = formatTime(cur);
+      totalTimeEl.textContent = formatTime(dur);
+    };
+
+    currentAudio.onended = () => {
+      onAudioEnded();
+    };
+
+    currentAudio.onerror = (e) => {
+      console.error('Audio playback error:', e);
+      setStatus('error', 'Error durante la reproducción del audio');
+      stopAudio();
+    };
+
+    await currentAudio.play();
+    lastTextPlayed = text;
+
+    // Show download button & summary
+    downloadLink.href = currentAudioUrl;
+    downloadSubtitle.textContent = `⚡ Sintetizado en ${totalClientSec}s (${finalSpeed.toLocaleString()} caract/s) · ${sizeKb} KB MP3`;
+    downloadSection.style.display = 'block';
+
+  } catch (err) {
+    if (synthIntervalTimer) {
+      clearInterval(synthIntervalTimer);
+      synthIntervalTimer = null;
+    }
+    metricsLiveBadge.className = 'metrics-live-badge';
+    metricsLiveBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+    metricsLiveBadge.style.color = '#fca5a5';
+    metricsLiveBadge.textContent = '❌ ERROR';
+
+    console.error('Error al generar audio:', err);
+    setStatus('error', err.message || 'No se pudo generar el audio');
+    playBtn.disabled = false;
+    stopBtn.disabled = true;
+    vizLabel.textContent = 'Error al generar audio';
+  }
+}
+
+function pauseAudio() {
+  if (currentAudio && isPlaying) {
+    currentAudio.pause();
+    isPaused = true;
+    isPlaying = false;
+    playIcon.style.display = 'block';
+    pauseIcon.style.display = 'none';
+    setStatus('idle', 'Reproducción pausada');
+    vizLabel.textContent = 'Pausado';
+  }
+}
+
+function resumeAudio() {
+  if (currentAudio && isPaused) {
+    currentAudio.play();
+    isPaused = false;
+    isPlaying = true;
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = 'block';
+    setStatus('speaking', 'Reproduciendo voz humana neuronal HD…');
+    vizLabel.textContent = '🔊 Reproduciendo Voz Humana HD';
+    drawActiveWave();
+  }
+}
+
+function stopAudio() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+  }
+  isPlaying = false;
+  isPaused = false;
+  playBtn.disabled = false;
+  stopBtn.disabled = true;
+  playIcon.style.display = 'block';
+  pauseIcon.style.display = 'none';
+  progressBar.style.width = '0%';
+  currentTimeEl.textContent = '0:00';
+  setStatus('idle', 'Audio detenido');
+  vizLabel.textContent = 'Listo para generar audio neuronal';
+  drawIdleWave();
+}
+
+function onAudioEnded() {
+  isPlaying = false;
+  isPaused = false;
+  playBtn.disabled = false;
+  stopBtn.disabled = true;
+  playIcon.style.display = 'block';
+  pauseIcon.style.display = 'none';
+  progressBar.style.width = '100%';
+  setStatus('idle', 'Reproducción finalizada');
+  vizLabel.textContent = 'Finalizado · Listo';
+  drawIdleWave();
+}
+
+async function prepareDownload() {
+  if (currentAudioUrl) {
+    downloadSection.scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+  await startAudio();
+}
+
+// ── Web Audio API Visualizer ───────────────────────────────
+function setupWebAudio(audioEl) {
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
+
+    const source = audioCtx.createMediaElementSource(audioEl);
+    source.connect(analyser);
+    analyser.connect(audioCtx.destination);
+  } catch (e) {
+    // MediaElementSource can only be connected once per element, which is safe to swallow if already bound
+  }
+}
+
+function drawActiveWave() {
+  if (!isPlaying) return;
+
+  const w = waveCanvas.width / window.devicePixelRatio;
+  const h = waveCanvas.height / window.devicePixelRatio;
+  ctx.clearRect(0, 0, w, h);
+
+  let dataArray = new Uint8Array(32);
+  if (analyser) {
+    analyser.getByteFrequencyData(dataArray);
+  } else {
+    for (let i = 0; i < 32; i++) dataArray[i] = Math.random() * 200;
   }
 
-  const mergedBlob = new Blob(blobs, { type: 'audio/mpeg' });
-  if (mergedBlob.size < 200) throw new Error('Audio too small');
+  const barWidth = (w / 32) * 0.8;
+  let x = 0;
 
-  audioBlob = mergedBlob;
-  presentDownloadFile(mergedBlob, 'mp3');
+  for (let i = 0; i < 32; i++) {
+    const val = dataArray[i] / 255;
+    const barHeight = Math.max(4, val * h * 0.8);
+
+    const grad = ctx.createLinearGradient(0, h, 0, h - barHeight);
+    grad.addColorStop(0, '#6366f1');
+    grad.addColorStop(1, '#a855f7');
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(x, h / 2 - barHeight / 2, barWidth, barHeight, 4);
+    ctx.fill();
+
+    x += barWidth + 2;
+  }
+
+  animFrame = requestAnimationFrame(drawActiveWave);
 }
 
+function drawIdleWave() {
+  if (animFrame) cancelAnimationFrame(animFrame);
 
+  const w = waveCanvas.width / window.devicePixelRatio;
+  const h = waveCanvas.height / window.devicePixelRatio;
+  ctx.clearRect(0, 0, w, h);
 
-// ────────────────────────────────────────────────────────────
-// Shared: Present download file (used by Strategy 1 & 2)
-// ────────────────────────────────────────────────────────────
-function presentDownloadFile(blob, ext) {
-  const audioURL = URL.createObjectURL(blob);
-
-  downloadLink.href = audioURL;
-  downloadLink.download = `vozai-audio-${Date.now()}.${ext}`;
-  downloadLink.target = '';
-  downloadLink.textContent = '';
-
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('fill', 'currentColor');
-  svg.innerHTML = '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>';
-  downloadLink.appendChild(svg);
-  downloadLink.appendChild(document.createTextNode(` Descargar ${ext.toUpperCase()}`));
-
-  const sizeKB = Math.round(blob.size / 1024);
-  downloadSubtitle.textContent = `Audio listo · ${sizeKB} KB`;
-
-  downloadBtn.disabled = false;
-  isRecordingDownload = false;
-  setStatus('success', '✅ Audio listo — haz clic para descargar');
+  ctx.strokeStyle = 'rgba(99, 102, 241, 0.2)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, h / 2);
+  ctx.lineTo(w, h / 2);
+  ctx.stroke();
 }
 
-// ── Status Helpers ─────────────────────────────────────────
-function setStatus(type, msg) {
+// ── Helpers ────────────────────────────────────────────────
+function setStatus(state, msg) {
   statusText.textContent = msg;
-  statusDot.className = 'status-dot';
-  if (type === 'active')  statusDot.classList.add('active');
-  if (type === 'success') statusDot.classList.add('success');
-  if (type === 'error')   statusDot.classList.add('error');
+  statusDot.className = 'status-dot ' + state;
 }
 
-// ── Handle page visibility (Chrome bug fix) ────────────────
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && isSpeaking && !isPaused) {
-    // Chrome stops speech when tab is hidden — restart if needed
-    // Not restarted here to avoid complexity, just log
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+// ── Novel Mode Controller ──────────────────────────────────
+let novelChapters = [];
+let isBatchRunning = false;
+let isBatchPaused = false;
+let activeBatchIndex = 0;
+
+const tabFreeText        = document.getElementById('tabFreeText');
+const tabNovelMode       = document.getElementById('tabNovelMode');
+const freeTextSection    = document.getElementById('freeTextSection');
+const novelSection       = document.getElementById('novelSection');
+const novelDropzone      = document.getElementById('novelDropzone');
+const novelFileInput     = document.getElementById('novelFileInput');
+const novelSummaryCard   = document.getElementById('novelSummaryCard');
+const novelDocTitle      = document.getElementById('novelDocTitle');
+const novelDocStats      = document.getElementById('novelDocStats');
+const startBatchBtn      = document.getElementById('startBatchBtn');
+const pauseBatchBtn      = document.getElementById('pauseBatchBtn');
+const downloadAllZipBtn  = document.getElementById('downloadAllZipBtn');
+const batchProgressLabel = document.getElementById('batchProgressLabel');
+const batchPercentLabel  = document.getElementById('batchPercentLabel');
+const batchProgressBar   = document.getElementById('batchProgressBar');
+const chaptersStatusCount= document.getElementById('chaptersStatusCount');
+const chaptersTableBody  = document.getElementById('chaptersTableBody');
+
+function initNovelMode() {
+  if (!tabFreeText || !tabNovelMode) return;
+
+  tabFreeText.addEventListener('click', () => {
+    tabFreeText.classList.add('active');
+    tabNovelMode.classList.remove('active');
+    if (freeTextSection) freeTextSection.style.display = 'block';
+    if (novelSection) novelSection.style.display = 'none';
+  });
+
+  tabNovelMode.addEventListener('click', () => {
+    tabNovelMode.classList.add('active');
+    tabFreeText.classList.remove('active');
+    if (freeTextSection) freeTextSection.style.display = 'none';
+    if (novelSection) novelSection.style.display = 'block';
+  });
+
+  novelDropzone.addEventListener('click', () => novelFileInput.click());
+  novelFileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      uploadNovelFile(e.target.files[0]);
+    }
+  });
+
+  novelDropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    novelDropzone.classList.add('dragover');
+  });
+
+  novelDropzone.addEventListener('dragleave', () => {
+    novelDropzone.classList.remove('dragover');
+  });
+
+  novelDropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    novelDropzone.classList.remove('dragover');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      uploadNovelFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  startBatchBtn.addEventListener('click', startBatchProcessing);
+  pauseBatchBtn.addEventListener('click', pauseBatchProcessing);
+}
+
+async function uploadNovelFile(file) {
+  const allowed = ['.docx', '.pdf', '.txt'];
+  const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+  if (!allowed.includes(ext)) {
+    alert('Por favor selecciona un archivo Word (.docx), PDF (.pdf) o Texto (.txt)');
+    return;
   }
+
+  const originalContent = novelDropzone.innerHTML;
+  novelDropzone.innerHTML = `
+    <div class="dropzone-content">
+      <div class="dropzone-icon" style="animation: spin 1.5s linear infinite;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      </div>
+      <h3>Analizando "${file.name}"...</h3>
+      <p>Extrayendo texto y detectando capítulos automáticamente. Esto tomará unos segundos.</p>
+    </div>
+  `;
+
+  try {
+    setStatus('loading', `Analizando documento "${file.name}"...`);
+    const res = await fetch('/api/upload-novel', {
+      method: 'POST',
+      headers: {
+        'X-Filename': encodeURIComponent(file.name)
+      },
+      body: file
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Error de servidor HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    novelChapters = (data.chapters || []).map(ch => ({
+      ...ch,
+      status: 'pending',
+      audioUrl: null,
+      filename: null
+    }));
+
+    novelDocTitle.textContent = data.filename || file.name;
+    const estHours = (data.totalWords / 150 / 60).toFixed(1);
+    novelDocStats.textContent = `${novelChapters.length} capítulos detectados · ${data.totalWords.toLocaleString()} palabras · ~${estHours} horas de audio estimadas`;
+
+    renderChaptersTable();
+    updateBatchProgress();
+
+    novelSummaryCard.style.display = 'block';
+    setStatus('idle', `Novela cargada: ${novelChapters.length} capítulos listos para generar`);
+    novelSummaryCard.scrollIntoView({ behavior: 'smooth' });
+
+  } catch (err) {
+    console.error('Error al subir novela:', err);
+    alert('Error al analizar la novela: ' + err.message);
+    setStatus('error', 'Error al procesar el archivo');
+  } finally {
+    novelDropzone.innerHTML = originalContent;
+  }
+}
+
+function renderChaptersTable() {
+  chaptersTableBody.innerHTML = '';
+  novelChapters.forEach((ch, idx) => {
+    const tr = document.createElement('tr');
+    tr.id = `chapter-row-${ch.id}`;
+
+    let statusHtml = '';
+    if (ch.status === 'pending') {
+      statusHtml = '<span class="badge-ch-status pending">⏳ Pendiente</span>';
+    } else if (ch.status === 'processing') {
+      statusHtml = '<span class="badge-ch-status processing">⚙️ Sintetizando...</span>';
+    } else if (ch.status === 'completed') {
+      statusHtml = '<span class="badge-ch-status completed">✅ Listo</span>';
+    } else if (ch.status === 'error') {
+      statusHtml = '<span class="badge-ch-status error">❌ Error</span>';
+    }
+
+    let actionsHtml = '';
+    if (ch.status === 'completed' && ch.audioUrl) {
+      actionsHtml = `
+        <button class="row-btn" onclick="playChapterAudio('${ch.audioUrl}', '${ch.title}')" title="Escuchar">▶️ Escuchar</button>
+        <a class="row-btn download" href="${ch.audioUrl}" download="${ch.filename}" title="Descargar MP3 offline">⬇️ MP3</a>
+      `;
+    } else {
+      actionsHtml = `
+        <button class="row-btn" onclick="synthesizeSingleChapter(${idx})" title="Generar solo este capítulo">⚡ Generar</button>
+      `;
+    }
+
+    tr.innerHTML = `
+      <td style="color: var(--text-muted); font-weight: 600;">#${ch.id}</td>
+      <td style="font-weight: 500;">${escapeHtml(ch.title)}</td>
+      <td style="color: var(--text-secondary);">${ch.wordCount.toLocaleString()}</td>
+      <td id="chapter-status-${ch.id}">${statusHtml}</td>
+      <td id="chapter-actions-${ch.id}" style="text-align: right;">${actionsHtml}</td>
+    `;
+    chaptersTableBody.appendChild(tr);
+  });
+}
+
+function updateBatchProgress() {
+  const total = novelChapters.length;
+  const completed = novelChapters.filter(c => c.status === 'completed').length;
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  batchProgressLabel.textContent = `Progreso general: ${completed} de ${total} capítulos completados`;
+  batchPercentLabel.textContent = `${pct}%`;
+  batchProgressBar.style.width = `${pct}%`;
+  chaptersStatusCount.textContent = `${completed} de ${total} completados`;
+
+  if (completed > 0) {
+    downloadAllZipBtn.style.display = 'inline-flex';
+  }
+}
+
+async function startBatchProcessing() {
+  if (novelChapters.length === 0) return;
+
+  isBatchRunning = true;
+  isBatchPaused = false;
+  startBatchBtn.style.display = 'none';
+  pauseBatchBtn.style.display = 'inline-flex';
+
+  for (let i = 0; i < novelChapters.length; i++) {
+    if (isBatchPaused) {
+      setStatus('idle', 'Generación en lote pausada');
+      break;
+    }
+
+    const ch = novelChapters[i];
+    if (ch.status === 'completed') continue;
+
+    // Scroll to active row
+    const rowEl = document.getElementById(`chapter-row-${ch.id}`);
+    if (rowEl) rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    await processChapter(i);
+  }
+
+  isBatchRunning = false;
+  pauseBatchBtn.style.display = 'none';
+  startBatchBtn.style.display = 'inline-flex';
+
+  const completed = novelChapters.filter(c => c.status === 'completed').length;
+  if (completed === novelChapters.length) {
+    startBatchBtn.textContent = '✅ Todos los Capítulos Generados';
+    startBatchBtn.disabled = true;
+    setStatus('success', '¡Audiolibro completo generado exitosamente!');
+  } else if (isBatchPaused) {
+    startBatchBtn.textContent = '▶️ Reanudar Generación';
+  }
+}
+
+function pauseBatchProcessing() {
+  isBatchPaused = true;
+  pauseBatchBtn.style.display = 'none';
+  startBatchBtn.style.display = 'inline-flex';
+  startBatchBtn.textContent = '▶️ Reanudar Generación';
+  setStatus('idle', 'Pausando generación tras el capítulo actual...');
+}
+
+async function processChapter(index) {
+  const ch = novelChapters[index];
+  ch.status = 'processing';
+  updateChapterRowUI(ch);
+
+  setStatus('loading', `Sintetizando ${ch.title} (${index + 1}/${novelChapters.length})...`);
+
+  try {
+    const res = await fetch('/api/synthesize-chapter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chapterId: ch.id,
+        title: ch.title,
+        text: ch.text,
+        voice: voiceSelect.value || 'es-MX-JorgeNeural',
+        rate: speedRange.value || '1.0',
+        pitch: pitchRange.value || '1.0'
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Error ${res.status}`);
+    }
+
+    const data = await res.json();
+    ch.status = 'completed';
+    ch.audioUrl = data.url;
+    ch.filename = data.filename;
+    updateChapterRowUI(ch);
+    updateBatchProgress();
+
+  } catch (err) {
+    console.error(`Error en capítulo ${ch.id}:`, err);
+    ch.status = 'error';
+    updateChapterRowUI(ch);
+  }
+}
+
+function updateChapterRowUI(ch) {
+  const statusEl = document.getElementById(`chapter-status-${ch.id}`);
+  const actionsEl = document.getElementById(`chapter-actions-${ch.id}`);
+  if (!statusEl || !actionsEl) return;
+
+  if (ch.status === 'processing') {
+    statusEl.innerHTML = '<span class="badge-ch-status processing">⚙️ Sintetizando...</span>';
+  } else if (ch.status === 'completed') {
+    statusEl.innerHTML = '<span class="badge-ch-status completed">✅ Listo</span>';
+    actionsEl.innerHTML = `
+      <button class="row-btn" onclick="playChapterAudio('${ch.audioUrl}', '${escapeHtml(ch.title)}')" title="Escuchar">▶️ Escuchar</button>
+      <a class="row-btn download" href="${ch.audioUrl}" download="${ch.filename}" title="Descargar MP3 offline">⬇️ MP3</a>
+    `;
+  } else if (ch.status === 'error') {
+    statusEl.innerHTML = '<span class="badge-ch-status error">❌ Error</span>';
+    actionsEl.innerHTML = `
+      <button class="row-btn" onclick="synthesizeSingleChapter(${novelChapters.indexOf(ch)})" title="Reintentar">🔄 Reintentar</button>
+    `;
+  }
+}
+
+async function synthesizeSingleChapter(index) {
+  await processChapter(index);
+}
+
+function playChapterAudio(url, title) {
+  if (currentAudio) {
+    currentAudio.pause();
+  }
+  currentAudio = new Audio(url);
+  currentAudio.playbackRate = parseFloat(speedRange.value);
+  setupWebAudio(currentAudio);
+
+  currentAudio.onplay = () => {
+    isPlaying = true;
+    isPaused = false;
+    playBtn.disabled = false;
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = 'block';
+    setStatus('speaking', `Reproduciendo: ${title}`);
+    vizLabel.textContent = `🔊 ${title}`;
+    drawActiveWave();
+  };
+
+  currentAudio.ontimeupdate = () => {
+    if (!currentAudio) return;
+    const cur = currentAudio.currentTime || 0;
+    const dur = currentAudio.duration || 1;
+    const pct = (cur / dur) * 100;
+    progressBar.style.width = `${pct}%`;
+    currentTimeEl.textContent = formatTime(cur);
+    totalTimeEl.textContent = formatTime(dur);
+  };
+
+  currentAudio.onended = onAudioEnded;
+  currentAudio.play();
+
+  // Scroll player into view
+  document.querySelector('.player-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Ensure initNovelMode is called on load
+window.addEventListener('DOMContentLoaded', () => {
+  initNovelMode();
 });
 
-// Fix Chrome speechSynthesis bug (stops after ~15s)
-setInterval(() => {
-  if (isSpeaking && !isPaused) {
-    window.speechSynthesis.resume();
-  }
-}, 10000);

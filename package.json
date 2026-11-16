@@ -9,5 +9,11 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@andresaya/edge-tts": "^1.9.1",
+    "archiver": "^8.0.0",
+    "mammoth": "^1.12.3",
+    "pdf-parse": "^2.4.5"
+  }
 }

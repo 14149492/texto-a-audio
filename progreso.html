@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Progreso del Audiolibro · VozAI</title>
+  <meta name="description" content="Seguimiento en vivo de la generación de capítulos del audiolibro con voces neuronales.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: hsl(250 30% 6%);
+      --card: hsla(250 30% 16% / .55);
+      --border: hsla(260 60% 80% / .12);
+      --text: hsl(250 20% 94%);
+      --muted: hsl(250 12% 65%);
+      --a1: hsl(265 90% 66%);
+      --a2: hsl(190 95% 55%);
+      --ok: hsl(150 70% 52%);
+      --err: hsl(350 85% 63%);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', sans-serif; color: var(--text); background: var(--bg);
+      min-height: 100vh; padding: 40px 20px 80px;
+      background-image:
+        radial-gradient(60vw 60vw at 10% -10%, hsla(265 90% 50% / .25), transparent 60%),
+        radial-gradient(50vw 50vw at 110% 10%, hsla(190 95% 45% / .18), transparent 60%);
+      background-attachment: fixed;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 22px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+    h1 { font-size: clamp(1.6rem, 3.5vw, 2.3rem); font-weight: 800; letter-spacing: -.02em;
+      background: linear-gradient(90deg, var(--a1), var(--a2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .sub { color: var(--muted); margin-top: 4px; }
+    .back { color: var(--text); text-decoration: none; padding: 10px 16px; border: 1px solid var(--border); border-radius: 12px;
+      background: var(--card); backdrop-filter: blur(12px); transition: .2s; }
+    .back:hover { border-color: var(--a1); transform: translateY(-2px); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 26px;
+      backdrop-filter: blur(16px); box-shadow: 0 20px 60px -20px rgba(0,0,0,.6); }
+    .status { display: inline-flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 600;
+      padding: 6px 12px; border-radius: 999px; background: hsla(150 70% 50% / .12); color: var(--ok); }
+    .status .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.4s infinite; }
+    .status.stale { background: hsla(40 90% 55% / .12); color: hsl(40 90% 60%); }
+    .status.stale .dot, .status.done .dot { animation: none; }
+    .status.done { background: hsla(190 95% 55% / .12); color: var(--a2); }
+    @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .3; transform: scale(.7); } }
+
+    .big { display: flex; align-items: baseline; gap: 12px; margin: 18px 0 14px; flex-wrap: wrap; }
+    .pct { font-size: clamp(3rem, 9vw, 5rem); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+    .count { color: var(--muted); font-size: 1.1rem; }
+    .bar { height: 14px; border-radius: 999px; background: hsla(250 30% 30% / .5); overflow: hidden; position: relative; }
+    .bar > i { display: block; height: 100%; width: 0; border-radius: inherit; transition: width .8s cubic-bezier(.2,.8,.2,1);
+      background: linear-gradient(90deg, var(--a1), var(--a2)); box-shadow: 0 0 24px hsla(265 90% 66% / .6); position: relative; overflow: hidden; }
+    .bar > i::after { content: ''; position: absolute; inset: 0; animation: shine 2s infinite;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); }
+    @keyframes shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-top: 22px; }
+    .stat { padding: 14px 16px; border-radius: 14px; background: hsla(250 30% 10% / .5); border: 1px solid var(--border); }
+    .stat b { display: block; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+    .stat span { color: var(--muted); font-size: .82rem; text-transform: uppercase; letter-spacing: .06em; }
+
+    .now h2, .list h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 14px; }
+    .now-title { font-size: 1.4rem; font-weight: 600; }
+    .now-title em { font-style: normal; color: var(--a2); margin-right: 8px; }
+    .wave { display: flex; gap: 4px; align-items: center; height: 28px; margin: 14px 0; }
+    .wave i { width: 4px; border-radius: 4px; background: linear-gradient(var(--a1), var(--a2)); animation: wave 1s ease-in-out infinite; }
+    @keyframes wave { 0%,100% { height: 6px; } 50% { height: 28px; } }
+    .small-bar { height: 8px; margin-top: 6px; }
+    .muted { color: var(--muted); font-size: .9rem; }
+
+    .items { display: grid; gap: 10px; max-height: 620px; overflow-y: auto; padding-right: 6px; }
+    .items::-webkit-scrollbar { width: 8px; } .items::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+    .item { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 14px; padding: 12px 14px;
+      border-radius: 14px; background: hsla(250 30% 10% / .45); border: 1px solid var(--border); animation: pop .4s ease; transition: .2s; }
+    .item:hover { border-color: hsla(265 90% 66% / .5); }
+    @keyframes pop { from { opacity: 0; transform: translateY(8px); } }
+    .num { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--a2); font-size: 1.05rem; }
+    .t { font-weight: 600; } .meta { color: var(--muted); font-size: .8rem; margin-top: 2px; }
+    audio { height: 34px; width: 260px; max-width: 42vw; }
+    .item.error { border-color: hsla(350 85% 63% / .4); } .item.error .num { color: var(--err); }
+    .empty { color: var(--muted); text-align: center; padding: 30px; }
+    @media (max-width: 640px) { .item { grid-template-columns: 50px 1fr; } audio { grid-column: 1 / -1; width: 100%; max-width: none; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div>
+        <h1>Progreso del Audiolibro</h1>
+        <p class="sub" id="novel-name">Cargando…</p>
+      </div>
+      <a class="back" href="/" id="back-link">← Volver a VozAI</a>
+    </header>
+
+    <section class="card" id="overview">
+      <span class="status" id="status"><span class="dot"></span><span id="status-text">Conectando…</span></span>
+      <div class="big"><span class="pct" id="pct">0%</span><span class="count" id="count">0 / 0 capítulos</span></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="stats">
+        <div class="stat"><b id="s-eta">—</b><span>Tiempo restante</span></div>
+        <div class="stat"><b id="s-elapsed">—</b><span>Transcurrido</span></div>
+        <div class="stat"><b id="s-avg">—</b><span>Promedio / capítulo</span></div>
+        <div class="stat"><b id="s-size">—</b><span>Tamaño total</span></div>
+      </div>
+    </section>
+
+    <section class="card now" id="now-card">
+      <h2>Generando ahora</h2>
+      <div id="now-body" class="muted">—</div>
+    </section>
+
+    <section class="card list">
+      <h2>Capítulos listos <span id="ready-count"></span></h2>
+      <div class="items" id="items"><div class="empty">Aún no hay capítulos terminados.</div></div>
+    </section>
+  </main>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const rendered = new Set();
+    const fmt = s => {
+      if (s == null || !isFinite(s)) return '—';
+      s = Math.max(0, Math.round(s));
+      const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+      return h ? `${h}h ${m}m` : m ? `${m}m ${sec}s` : `${sec}s`;
+    };
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    async function tick() {
+      try {
+        const r = await fetch('/api/progreso', { cache: 'no-store' });
+        const { now, jobs } = await r.json();
+        if (!jobs || !jobs.length) { $('status-text').textContent = 'Sin trabajos en curso'; return; }
+        render(jobs[0], now);
+      } catch (e) {
+        $('status').className = 'status stale';
+        $('status-text').textContent = 'Servidor no disponible';
+      }
+    }
+
+    function render(p, now) {
+      $('novel-name').textContent = `${p.novel} · Capítulos ${p.from} → ${p.to}`;
+      const done = p.done.length, errs = p.errors.length, total = p.total;
+      const partial = p.current ? (p.current.chunksDone / Math.max(1, p.current.chunksTotal)) : 0;
+      const pct = Math.min(100, ((done + errs + partial) / total) * 100);
+      $('pct').textContent = pct.toFixed(1) + '%';
+      $('count').textContent = `${done} / ${total} capítulos` + (errs ? ` · ${errs} con error` : '');
+      $('bar').style.width = pct + '%';
+
+      const stale = now - p.updatedAt > 90000;
+      const st = $('status');
+      if (p.status === 'finished') { st.className = 'status done'; $('status-text').textContent = '¡Completado!'; }
+      else if (stale) { st.className = 'status stale'; $('status-text').textContent = 'Sin actividad reciente (¿proceso detenido?)'; }
+      else { st.className = 'status'; $('status-text').textContent = 'Generando en vivo'; }
+
+      const timed = p.done.filter(d => d.seconds);
+      const avg = timed.length ? timed.reduce((a, d) => a + d.seconds, 0) / timed.length : null;
+      const remaining = total - done - errs - partial;
+      $('s-avg').textContent = fmt(avg);
+      $('s-eta').textContent = p.status === 'finished' ? 'Listo' : fmt(avg ? remaining * avg : null);
+      $('s-elapsed').textContent = fmt((now - p.startedAt) / 1000);
+      $('s-size').textContent = p.done.reduce((a, d) => a + d.sizeMb, 0).toFixed(0) + ' MB';
+
+      if (p.current) {
+        const c = p.current, cp = (c.chunksDone / c.chunksTotal) * 100;
+        $('now-body').innerHTML = `
+          <div class="now-title"><em>Cap. ${c.num}</em>${esc(c.title)}</div>
+          <div class="wave">${Array.from({ length: 24 }, (_, i) => `<i style="animation-delay:${(i * 0.07).toFixed(2)}s"></i>`).join('')}</div>
+          <div class="muted">Fragmento ${c.chunksDone} de ${c.chunksTotal} · ${fmt((now - c.startedAt) / 1000)}</div>
+          <div class="bar small-bar"><i style="width:${cp}%"></i></div>`;
+      } else {
+        $('now-body').innerHTML = `<span class="muted">${p.status === 'finished' ? 'Todos los capítulos fueron procesados 🎉' : 'Preparando siguiente capítulo…'}</span>`;
+      }
+
+      // Lista (más recientes arriba), solo agrega los nuevos para no cortar el audio en reproducción
+      const box = $('items');
+      if (rendered.size === 0 && (done || errs)) box.innerHTML = '';
+      $('ready-count').textContent = `(${done})`;
+      const all = [...p.done.map(d => ({ ...d, ok: true })), ...p.errors.map(e => ({ ...e, ok: false }))]
+        .sort((a, b) => a.num - b.num);
+      for (const it of all) {
+        const key = (it.ok ? 'ok' : 'err') + it.num;
+        if (rendered.has(key)) continue;
+        rendered.add(key);
+        const el = document.createElement('div');
+        el.className = 'item' + (it.ok ? '' : ' error');
+        el.id = 'chapter-' + it.num;
+        el.innerHTML = it.ok
+          ? `<span class="num">#${it.num}</span>
+             <div><div class="t">${esc(it.title)}</div><div class="meta">${it.sizeMb} MB${it.seconds ? ' · generado en ' + it.seconds + 's' : ''}</div></div>
+             <audio controls preload="none" src="/audiolibro/${encodeURIComponent(p.folder)}/${encodeURIComponent(it.file)}"></audio>`
+          : `<span class="num">#${it.num}</span><div><div class="t">${esc(it.title)}</div><div class="meta">Error: ${esc(it.message)}</div></div><span></span>`;
+        box.prepend(el);
+      }
+    }
+
+    tick();
+    setInterval(tick, 3000);
+  </script>
+</body>
+</html>
